@@ -26,7 +26,11 @@ class EnvReplayBuffer(SimpleReplayBuffer):
             next_observation, **kwargs):
 
         if isinstance(self._action_space, Discrete):
-            action = np.eye(self._action_space.n)[action]
+            # CHANGE
+            #action = np.eye(self._action_space.n)[action]
+            onehot = np.zeros(self._action_space.n)
+            onehot[action] = 1
+            action = onehot
         super(EnvReplayBuffer, self).add_sample(
                 observation, action, reward, terminal, 
                 next_observation, **kwargs)
@@ -34,7 +38,9 @@ class EnvReplayBuffer(SimpleReplayBuffer):
 
 def get_dim(space):
     if isinstance(space, Box):
-        return space.low.size
+        # CHANGE
+        #return space.low.size
+        return space.low.shape
     elif isinstance(space, Discrete):
         return space.n
     elif isinstance(space, Tuple):
