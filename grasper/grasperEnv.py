@@ -31,29 +31,28 @@ class GraspingWorld(Env):
         self.is_gripping = False
         self.action_space = spaces.Discrete(512*512*4)
         self.observation_space = spaces.Box(0,255,[3,500,500],dtype=np.uint8)
+        self.assets_file = 'grasper/assets/grasper.xml'
+        self.initEnv()
 
-    def reset(self):
-        vhacd=False
-        render=False
-        seed=1337
-        debug=False
+        self.rewards = np.array([])
 
+    def initEnv(self, seed=1337):
         objs = []
         objs.append(MockObject('rectangle'))
         objs.append(MockObject('sphere'))
         objs.append(MockObject('cylinder'))
         objs.append(MockObject('ellipsoid'))
-        #objs.append(MeshObject('whistle', vhacd, target_size=0.03, target_mass=0.05))
+        #objs.append(MeshObject('whistle', False, target_size=0.03, target_mass=0.05))
         self.obj_num = 0
 
         # create xml file for environment
-        grasper_maker.grasper(target_objs=objs, friction=[5, 0.1, 0.1]).save('grasper/assets/grasper.xml')
+        grasper_maker.grasper(target_objs=objs, friction=[5, 0.1, 0.1]).save(self.assets_file)
 
         # start simulation
-        self.model = Grasper(model_path="grasper/assets/grasper.xml", objs=objs, render=render, seed=seed, debug=debug)
+        self.model = Grasper(model_path=self.assets_file, objs=objs, render=False, seed=seed, debug=False)
         self.model.idle()
-        count = 0
 
+    def reset(self, seed=1337):
         target_xs, target_ys, target_angles = self.model.reset_targets()
 
         other_loc = []
@@ -118,8 +117,9 @@ class GraspingWorld(Env):
             self.is_gripping = up_flag
 
             obs = self.render()
-            reward = int(up_flat)
-            print(reward)
+            reward = int(up_flag)
+            self.rewards = np.append(self.rewards, reward)
+            np.save('rewards.npy', self.rewards)
 
             return obs, reward, True, dict()
         else:
@@ -394,7 +394,4 @@ class Grasper():
     def get_body_xmat(self, body_name):
         idx = self.sim.body_names.index(six.b(body_name))
         return self.sim.data.xmat[idx].reshape((3, 3))
-
-env = GraspingWorld()
-env.reset()
 
