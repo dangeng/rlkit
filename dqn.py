@@ -32,10 +32,11 @@ class QFunction(PyTorchModule):
         self.upscale = Interpolator(4,8,odd=False)
 
     def forward(self, x):
+        batches = x.shape[0]
         x = self.resnet(x)
         x = self.dimReduc(x)
         x = self.upscale(x)
-        return x.flatten()
+        return x.view(batches, -1)
 
 def experiment(variant):
     env = GraspingWorld()
@@ -51,7 +52,7 @@ def experiment(variant):
         training_env=training_env,
         qf=qf,
         qf_criterion=qf_criterion,
-        replay_buffer_size=10,
+        replay_buffer_size=1000,
         **variant['algo_params']
     )
     algorithm.to(ptu.device)
@@ -65,14 +66,16 @@ if __name__ == "__main__":
             num_epochs=500,
             num_steps_per_epoch=1000,
             num_steps_per_eval=1000,
-            batch_size=128,
+            batch_size=4,
             max_path_length=200,
             discount=0.99,
             epsilon=0.2,
             tau=0.001,
             hard_update_period=1000,
+            min_num_steps_before_training=10,
             save_environment=False,  # Can't serialize CartPole for some reason
         ),
     )
-    setup_logger('name-of-experiment', variant=variant)
+    ptu.set_gpu_mode(True, 1)
+    setup_logger('dqn_grasper', variant=variant)
     experiment(variant)
