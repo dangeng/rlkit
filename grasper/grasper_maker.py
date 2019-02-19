@@ -116,6 +116,8 @@ def grasper(gripper_pos=[0.0, 0.0, 0.2], target_pos=[0.0, 0.0, 0.0], friction=[2
     mjcmodel = MJCModel('grasper')
     mjcmodel.root.compiler(inertiafromgeom="true", angle="radian", coordinate="local", meshdir="meshes", texturedir="textures")
     mjcmodel.root.option(timestep="0.01",gravity="0 0 -9.81", tolerance=1e-12, impratio=10, noslip_iterations=100, cone='elliptic')
+    size = mjcmodel.root.size()
+    size.add_attr('nconmax', 1000)
     default = mjcmodel.root.default()
     default.joint(armature="1", damping=1, limited="true")
     default.geom(friction=friction, condim=4, contype="1", conaffinity="1", solimp="0.999 0.999 0.01", solref="0.01 1", rgba="1 1 1 1")
