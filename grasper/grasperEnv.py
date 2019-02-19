@@ -39,7 +39,8 @@ class GraspingWorld(Env):
     def initEnv(self, seed=1337):
         objs = []
         objs.append(MockObject('rectangle'))
-        objs.append(MockObject('sphere'))
+        for i in range(20):
+            objs.append(MockObject('sphere'))
         objs.append(MockObject('cylinder'))
         objs.append(MockObject('ellipsoid'))
         #objs.append(MeshObject('whistle', False, target_size=0.03, target_mass=0.05))
@@ -133,6 +134,11 @@ class GraspingWorld(Env):
             # declare victory if target is lifted off table
             up_flag = self.model.obj_z() - self.z0 > 0.01
             self.is_gripping = up_flag
+
+            obs = self.render()
+            reward = int(up_flag)
+
+            return obs, reward, True, dict()
 
     def render(self):
         return self.model._render(mode='rgb_array').transpose(2,0,1)
