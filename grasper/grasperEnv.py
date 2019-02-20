@@ -7,7 +7,7 @@ import six
 import click
 import h5py
 from grasper import log
-
+import time
 import mujoco_py
 from . import grasper_maker
 from .target import MeshObject
@@ -29,7 +29,7 @@ get_out_of_the_picture_height=1
 class GraspingWorld(Env):
     def __init__(self):
         self.is_gripping = False
-        self.action_space = spaces.Discrete(512*512*4)
+        self.action_space = spaces.Discrete(500*500*4)
         self.observation_space = spaces.Box(0,255,[3,500,500],dtype=np.uint8)
         self.assets_file = 'grasper/assets/grasper.xml'
         self.initEnv()
@@ -39,7 +39,7 @@ class GraspingWorld(Env):
     def initEnv(self, seed=1337):
         objs = []
         objs.append(MockObject('rectangle'))
-        for i in range(20):
+        for i in range(1):
             objs.append(MockObject('sphere'))
         objs.append(MockObject('cylinder'))
         objs.append(MockObject('ellipsoid'))
@@ -54,15 +54,16 @@ class GraspingWorld(Env):
         self.model.idle()
 
     def reset(self, seed=1337):
+        #t1 = time.clock()
         target_xs, target_ys, target_angles = self.model.reset_targets()
-
-        other_loc = []
-        for n in range(len(self.model.objs)):
-            target_x, target_y, target_angle = list(zip(target_xs, target_ys, target_angles))[n]
-            gripper_goal, gripper_angle = self.model.reset_gripper(target_x, target_y, target_angle, n)
-            other_loc.append(gripper_goal)
-
-        del other_loc[self.obj_num]
+        #t2 = time.clock()
+#         other_loc = []
+#         for n in range(len(self.model.objs)):
+#             target_x, target_y, target_angle = list(zip(target_xs, target_ys, target_angles))[n]
+#             gripper_goal, gripper_angle = self.model.reset_gripper(target_x, target_y, target_angle, n)
+#             other_loc.append(gripper_goal)
+        #t3 = time.clock()
+        #del other_loc[self.obj_num]
 
         self.obj = self.model.objs[self.obj_num]
         target_x, target_y, target_angle = list(zip(target_xs, target_ys, target_angles))[self.obj_num]
@@ -72,6 +73,8 @@ class GraspingWorld(Env):
         self.z0 = self.model.obj_z()
 
         image = self.render()
+        #t4 = time.clock()
+        #print("reset", t2-t1, t3-t2, t4-t3)
 
         return image.copy()
 
@@ -86,7 +89,7 @@ class GraspingWorld(Env):
         return correction * (p-b)/A
 
     def actionTranslator(self, action):
-        idx = np.unravel_index(action, (4,512,512))
+        idx = np.unravel_index(action, (4,500,500))
 
         angles = [-3*np.pi/8, -np.pi/8, np.pi/8, 3*np.pi/8]
         p = idx[1:3]
@@ -96,6 +99,7 @@ class GraspingWorld(Env):
         return [mj_coor[0], mj_coor[1], angle]
 
     def step(self, action):
+        #t1 = time.clock()
         action = self.actionTranslator(action)
 
         if not self.is_gripping:
@@ -122,7 +126,7 @@ class GraspingWorld(Env):
             self.rewards = np.append(self.rewards, reward)
             np.save('rewards.npy', self.rewards)
 
-            return obs, reward, True, dict()
+            #return obs, reward, True, dict()
         else:
             gripper_goal = action[:2]
             gripper_angle = action[2]
@@ -137,10 +141,12 @@ class GraspingWorld(Env):
 
             obs = self.render()
             reward = int(up_flag)
-
-            return obs, reward, True, dict()
+        #t2 = time.clock()
+        #print("step", t2-t1)
+        return obs, reward, True, dict()
 
     def render(self):
+        #self.model._render(mode='human')
         return self.model._render(mode='rgb_array').transpose(2,0,1)
 
 class Grasper():
@@ -162,6 +168,7 @@ class Grasper():
 
     def step(self, ctrl, n_frames):
         ''' step the simulation forward `n_frames` steps '''
+        #print("step", ctrl)
         self.sim.data.ctrl[:] = ctrl
         for _ in range(n_frames):
             self.sim.step()
@@ -233,13 +240,15 @@ class Grasper():
                 pos_xs.append(pos_x)
                 pos_ys.append(pos_y)
                 target_angles.append(target_angle)
-
+            #t1 = time.clock()
             self.set_state(qpos, self.init_qvel) # forward kinematics is calculated here
-
+            #t2 = time.clock()
+            #print("targets", t1-t2)
             # if objects are not colliding, the scene is valid
             if not self.check_obj_contact():
+                #print(i)
                 break
-
+        #print("colliding", self.check_obj_contact())
         return pos_xs, pos_ys, target_angles
 
     def raise_obj(self, num, height=.1):
@@ -366,9 +375,11 @@ class Grasper():
             return
 
         if mode == 'rgb_array':
-            self._get_viewer(mode).render(width, height)
+            if self.viewer is None:
+                self._get_viewer(mode).render(width, height)
             # window size used for old mujoco-py:
-            data = self._get_viewer(mode).read_pixels(width, height, depth=False)
+            data = self.sim.render(width, height)
+            #data = self._get_viewer(mode).read_pixels(width, height, depth=False)
             # original image is upside-down, so flip it
             return data[::-1, :, :]
 
